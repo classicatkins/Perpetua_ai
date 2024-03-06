@@ -5,6 +5,7 @@ import Navigo from "navigo";
 import { capitalize } from "lodash";
 import axios from "axios";
 import Chart from "chart.js/auto";
+import OpenAI from "openai";
 
 const router = new Navigo("/");
 
@@ -18,19 +19,143 @@ function render(state = store.Home) {
   afterRender(state);
 }
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  organization: "org-Sw56bLlkxqYCxFgGXGekYM04",
+  dangerouslyAllowBrowser: true
+});
+
+// const express = require("express");
+// // const OpenAI = require('openai');
+// const bodyParser = require("body-parser");
+
+// const app = express();
+// app.use(bodyParser.json());
+
+// app.post("/chat-message", async (req, res) => {
+//   try {
+//     const userMessage = req.body.message;
+
+//     const completion = await openai.chat.completions.create({
+//       messages: [{ role: "user", content: userMessage }],
+//       model: "gpt-3.5-turbo"
+//     });
+
+//     const aiMessage = completion.choices[0].message.content;
+//     res.json({ message: aiMessage });
+//   } catch (error) {
+//     console.error("Error:", error);
+//     res.status(500).send("Error processing your message");
+//   }
+// });
+
+// const PORT = process.env.PORT || 3000;
+// app.listen(PORT, () => {
+//   console.log(`Server is running on port ${PORT}`);
+// });
+
+// function displayMessage(sender, message) {
+//   const messageDiv = document.createElement("div");
+//   messageDiv.textContent = `${sender}: ${message}`;
+//   chatContainer.appendChild(messageDiv);
+// }
+
+// async function sendMessageToServer(message) {
+//   try {
+//     const response = await fetch("/chat-message", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json"
+//       },
+//       body: JSON.stringify({ message: message })
+//     });
+
+//     if (!response.ok) {
+//       throw new Error("Network response was not ok");
+//     }
+
+//     return response.json();
+//   } catch (error) {
+//     console.error("Error in sendMessageToServer:", error);
+//     throw error;
+//   }
+// }
+
+// async function getChatCompletion() {
+//   try {
+//     const completion = await openai.chat.completions.create({
+//       messages: [{ role: "system", content: "You are a helpful assistant." }],
+//       model: "gpt-3.5-turbo"
+//     });
+
+//     console.log(completion.choices[0].message.content);
+//   } catch (error) {
+//     console.error("Error in getChatCompletion:", error);
+//   }
+// }
+
+// async function getChatCompletion(userMessage) {
+//   try {
+//     const completion = await openai.chat.completions.create({
+//       messages: [{ role: "user", content: userMessage }],
+//       model: "gpt-3.5-turbo"
+//     });
+
+//     return completion.choices[0].message.content;
+//   } catch (error) {
+//     console.error("Error in getChatCompletion:", error);
+//     throw error; // Re-throw the error to handle it in the caller function
+//   }
+// }
+
+async function getChatCompletion(userMessage, threadId, assistantId) {
+  try {
+    // Step 3: Add the user's message to the thread
+    await openai.createMessage(threadId, {
+      role: "user",
+      content: userMessage
+    });
+
+    // Step 4: Run the Assistant on the thread
+    const run = await openai.createRun(threadId, {
+      assistant_id: assistantId
+    });
+
+    // Step 5: Retrieve the Run's status and get the response
+    // Assuming synchronous handling for simplicity. In a real-world use, you might need to poll the status.
+    const messages = await openai.listMessages(threadId);
+
+    // Assuming the last message in the thread is the assistant's response
+    const assistantResponse =
+        messages.data[messages.data.length - 1].content.text.value;
+
+    return assistantResponse;
+  } catch (error) {
+    console.error("Error in getChatCompletion:", error);
+    throw error; // Re-throw the error to handle it in the caller function
+  }
+}
+
+function displayMessage(sender, message) {
+  const chatContainer = document.getElementById("chat-container");
+  const messageDiv = document.createElement("div");
+  messageDiv.textContent = `${sender}: ${message}`;
+  chatContainer.appendChild(messageDiv);
+}
+
 function attachCheckboxListeners(state) {
   state.habits.forEach(habit => {
     const checkbox = document.getElementById(`habitCheckbox-${habit._id}`);
     if (checkbox) {
       checkbox.addEventListener("change", function() {
         handleHabitCheckboxChange(
-          this,
-          habit._id,
-          habit.dates,
-          habit.name,
-          habit.category,
-          habit.reminder,
-          habit.days
+            this,
+            habit._id,
+            habit.dates,
+            habit.name,
+            habit.category,
+            habit.reminder,
+            habit.days
         );
       });
     }
@@ -370,18 +495,18 @@ function routineChecked(rtnId) {
   };
 
   axios
-    .put(`${process.env.PERPETUA_API_URL}/routines/${rtnId}`, updateData)
-    .then(response => {
-      console.log(
-        "Category updated with new tally and recorded date:",
-        response.data
-      );
-      // TODO: Handle successful update, e.g., update the UI or state
-    })
-    .catch(error => {
-      console.error("Error updating category:", error);
-      // TODO: Handle errors here, e.g., show a notification
-    });
+      .put(`${process.env.PERPETUA_API_URL}/routines/${rtnId}`, updateData)
+      .then(response => {
+        console.log(
+            "Category updated with new tally and recorded date:",
+            response.data
+        );
+        // TODO: Handle successful update, e.g., update the UI or state
+      })
+      .catch(error => {
+        console.error("Error updating category:", error);
+        // TODO: Handle errors here, e.g., show a notification
+      });
 }
 
 function routineUnchecked(rtnId) {
@@ -392,18 +517,18 @@ function routineUnchecked(rtnId) {
   };
 
   axios
-    .put(`${process.env.PERPETUA_API_URL}/routines/${rtnId}`, updateData)
-    .then(response => {
-      console.log(
-        "Category updated with new tally and recorded date:",
-        response.data
-      );
-      // TODO: Handle successful update, e.g., update the UI or state
-    })
-    .catch(error => {
-      console.error("Error updating category:", error);
-      // TODO: Handle errors here, e.g., show a notification
-    });
+      .put(`${process.env.PERPETUA_API_URL}/routines/${rtnId}`, updateData)
+      .then(response => {
+        console.log(
+            "Category updated with new tally and recorded date:",
+            response.data
+        );
+        // TODO: Handle successful update, e.g., update the UI or state
+      })
+      .catch(error => {
+        console.error("Error updating category:", error);
+        // TODO: Handle errors here, e.g., show a notification
+      });
 }
 
 function handleHabitCheckboxChange(checkbox) {
@@ -417,21 +542,21 @@ function handleHabitCheckboxChange(checkbox) {
 
   if (checkbox.checked) {
     habitChecked(
-      habitId,
-      habitDates,
-      habitName,
-      habitCategory,
-      habitReminder,
-      habitDays
+        habitId,
+        habitDates,
+        habitName,
+        habitCategory,
+        habitReminder,
+        habitDays
     );
   } else {
     habitUnchecked(
-      habitId,
-      habitDates,
-      habitName,
-      habitCategory,
-      habitReminder,
-      habitDays
+        habitId,
+        habitDates,
+        habitName,
+        habitCategory,
+        habitReminder,
+        habitDays
     );
   }
 }
@@ -475,12 +600,12 @@ function handleRtnCheckboxChange(checkbox, routineId) {
 }
 
 async function habitChecked(
-  habitId,
-  habitDates,
-  habitName,
-  habitCategory,
-  habitReminder,
-  habitDays
+    habitId,
+    habitDates,
+    habitName,
+    habitCategory,
+    habitReminder,
+    habitDays
 ) {
   console.log(habitDates);
   if (!Array.isArray(habitDates)) {
@@ -500,19 +625,19 @@ async function habitChecked(
   console.log(updateData);
 
   await axios
-    .put(
-      "https://pixe.la/v1/users/matkins/graphs/all-habits/increment",
-      {},
-      {
-        headers: { "X-USER-TOKEN": 10251025 }
-      }
-    )
-    .then(response => {
-      console.log("User creation response:", response.data);
-    })
-    .catch(error => {
-      console.error("Error creating user:", error);
-    });
+      .put(
+          "https://pixe.la/v1/users/matkins/graphs/all-habits/increment",
+          {},
+          {
+            headers: { "X-USER-TOKEN": 10251025 }
+          }
+      )
+      .then(response => {
+        console.log("User creation response:", response.data);
+      })
+      .catch(error => {
+        console.error("Error creating user:", error);
+      });
 
   // await axios
   //   .put(`${process.env.PERPETUA_API_URL}/habits/${habitId}`, updateData)
@@ -537,24 +662,24 @@ async function habitChecked(
   });
 
   axios
-    .put(`${process.env.PERPETUA_API_URL}/habits/${habitId}`, {
-      name: updateData.name,
-      category: updateData.category,
-      days: updateData.days,
-      reminder: updateData.reminder,
-      dates: updateData.dates
-    })
-    .then(response => {
-      console.log(
-        "Category updated with new tally and recorded date:",
-        response.data
-      );
-      // TODO: Handle successful update, e.g., update the UI or state
-    })
-    .catch(error => {
-      console.error("Error updating category:", error);
-      // TODO: Handle errors here, e.g., show a notification
-    });
+      .put(`${process.env.PERPETUA_API_URL}/habits/${habitId}`, {
+        name: updateData.name,
+        category: updateData.category,
+        days: updateData.days,
+        reminder: updateData.reminder,
+        dates: updateData.dates
+      })
+      .then(response => {
+        console.log(
+            "Category updated with new tally and recorded date:",
+            response.data
+        );
+        // TODO: Handle successful update, e.g., update the UI or state
+      })
+      .catch(error => {
+        console.error("Error updating category:", error);
+        // TODO: Handle errors here, e.g., show a notification
+      });
 }
 
 async function habitUnchecked(habitId, habitDates) {
@@ -565,33 +690,33 @@ async function habitUnchecked(habitId, habitDates) {
   habitDates.pop();
 
   await axios
-    .put(
-      "https://pixe.la/v1/users/matkins/graphs/all-habits/decrement",
-      {},
-      {
-        headers: { "X-USER-TOKEN": 10251025 }
-      }
-    )
-    .then(response => {
-      console.log("User creation response:", response.data);
-    })
-    .catch(error => {
-      console.error("Error creating user:", error);
-    });
+      .put(
+          "https://pixe.la/v1/users/matkins/graphs/all-habits/decrement",
+          {},
+          {
+            headers: { "X-USER-TOKEN": 10251025 }
+          }
+      )
+      .then(response => {
+        console.log("User creation response:", response.data);
+      })
+      .catch(error => {
+        console.error("Error creating user:", error);
+      });
 
   await axios
-    .put(`${process.env.PERPETUA_API_URL}/habits/${habitId}`, updateData)
-    .then(response => {
-      console.log(
-        "Habit updated with new tally and recorded date:",
-        response.data
-      );
-      // TODO: Handle successful update, e.g., update the UI or state
-    })
-    .catch(error => {
-      console.error("Error updating category:", error);
-      // TODO: Handle errors here, e.g., show a notification
-    });
+      .put(`${process.env.PERPETUA_API_URL}/habits/${habitId}`)
+      .then(response => {
+        console.log(
+            "Habit updated with new tally and recorded date:",
+            response.data
+        );
+        // TODO: Handle successful update, e.g., update the UI or state
+      })
+      .catch(error => {
+        console.error("Error updating category:", error);
+        // TODO: Handle errors here, e.g., show a notification
+      });
 }
 
 function menuCat() {
@@ -680,7 +805,7 @@ function updateCalendar() {
         d.classList.remove("bold"); // Remove bold from all dates
         const dayDate = new Date(currentDate);
         dayDate.setDate(
-          dayDate.getDate() +
+            dayDate.getDate() +
             Array.prototype.indexOf.call(days, d) -
             dayDate.getDay()
         );
@@ -742,12 +867,174 @@ function afterRender(state) {
     new Chart(ctxRadar, configRadar);
   }
 
+  if (state.view === "Chat") {
+    document
+        .getElementById("message-form")
+        .addEventListener("submit", async function(event) {
+          event.preventDefault(); // Prevents the default form submission behavior
+
+          const userInputField = document.getElementById("user-input");
+          const userMessage = userInputField.value;
+
+          if (userMessage.trim() === "") {
+            alert("Please enter a message.");
+            return;
+          }
+
+          const habitData = [
+            {
+              _id: "ObjectId('65a74bd0725a457fa8f76b2b')",
+              name: "Brush Teeth",
+              days: [
+                "Sunday",
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday"
+              ],
+              reminder: "2024-01-24T00:00:00.000+00:00",
+              notes: "",
+              __v: 0
+            },
+            {
+              _id: "ObjectId('65aebcb83c491b7671f5a0e9')",
+              name: "Exercise",
+              category: "Health",
+              days: ["Monday", "Wednesday", "Friday"],
+              reminder: "2024-01-20T07:00:00.000+00:00",
+              notes: "Morning workout for 30 minutes.",
+              dates: [
+                {
+                  date: "2024-02-06",
+                  times: ["08:00:00", "11:30:00", "15:45:00"]
+                },
+                {
+                  date: "2024-02-07",
+                  times: ["09:00:00", "12:00:00", "17:30:00"]
+                },
+                {
+                  date: "2024-02-08",
+                  times: ["08:15:00", "13:45:00", "18:00:00"]
+                },
+                {
+                  date: "2024-02-09",
+                  times: ["07:30:00", "12:30:00", "16:15:00"]
+                },
+                {
+                  date: "2024-02-10",
+                  times: ["10:00:00", "14:00:00", "19:00:00"]
+                },
+                {
+                  date: "2024-02-11",
+                  times: ["08:45:00", "13:00:00", "17:15:00"]
+                },
+                {
+                  date: "2024-02-12",
+                  times: ["09:30:00", "14:30:00", "18:45:00"]
+                }
+              ],
+              __v: 0
+            },
+            {
+              _id: "ObjectId('65afecb83c491b7671f5a0f1')",
+              name: "Read a Book",
+              category: "Education",
+              days: ["Tuesday", "Thursday", "Saturday"],
+              reminder: "2024-01-21T20:00:00.000+00:00",
+              notes: "Read at least 30 pages.",
+              dates: [],
+              __v: 0
+            },
+            {
+              _id: "ObjectId('65b01dc83d492b7671f6a1e2')",
+              name: "Meditation",
+              category: "Wellness",
+              days: ["Monday", "Wednesday", "Friday"],
+              reminder: "2024-01-22T06:30:00.000+00:00",
+              notes: "15 minutes morning meditation.",
+              dates: [],
+              __v: 0
+            }
+          ];
+          const chatContainer = document.getElementById("chat-container");
+          const messageDiv = document.createElement("div");
+          messageDiv.textContent = `${"User"}: ${userMessage}`;
+          chatContainer.appendChild(messageDiv);
+
+          // Create an assistant
+          // const assistant = await openai.createAssistant({
+          //   name: "Perpetua",
+          //   instructions:
+          //     "You analyze my habits and give me feedback to perpetually do my habits.",
+          //   tools: [{ type: "code_interpreter" }, { type: "retrieval" }],
+          //   model: "gpt-3.5-turbo-1106"
+          // });
+
+          try {
+            // const assistant = await openai.beta.assistants.create({
+            //   name: "Perpetua",
+            //   instructions:
+            //     "You analyze my habits and give me feedback to perpetually do my habits.",
+            //   tools: [{ type: "code_interpreter" }, { type: "retrieval" }],
+            //   model: "gpt-3.5-turbo-1106"
+            // });
+
+            const assistant = await openai.beta.assistants.retrieve(
+                "asst_gqYxsVsPkvqFyNIZuvHzZ2Jj"
+            );
+
+            console.log(assistant);
+
+            // Create a thread
+            const thread = await openai.createThread({
+              // Thread settings...
+            });
+
+            const instruction =
+                "Each object is a habit. Dates in the habit data represent when the user performed the habit. If there is no date for the day the habit is assigned, it means the user did not do the habit that day.";
+
+            // Combine user message with habit data and instructions
+            const fullMessage = `${instruction}\n\n${JSON.stringify(
+                habitData,
+                null,
+                2
+            )}\n\nUser Message: ${userMessage}`;
+
+            // Add a message to the thread
+            await openai.createMessage(thread.data.id, {
+              role: "user",
+              content: fullMessage
+            });
+
+            // Run the Assistant on the thread
+            const run = await openai.createRun(thread.data.id, {
+              assistant_id: assistant.data.id
+            });
+
+            // Check the Run status and get the response
+            const messages = await openai.listMessages(thread.data.id);
+            const assistantResponse =
+                messages.data[messages.data.length - 1].content.text.value;
+
+            // Display the assistant's message in the chat
+            displayMessage("Perpetua", assistantResponse);
+
+            userInputField.value = ""; // Clear the input field after sending
+          } catch (error) {
+            console.error("Error while creating assistant:", error);
+          }
+        });
+  }
+
   if (state.view === "Home") {
     updateGreeting();
     var prevWeekButton = document.getElementById("prevWeek");
     if (prevWeekButton) {
       prevWeekButton.addEventListener("click", function() {
         moveCalendar(-7);
+        getChatCompletion();
       });
     }
 
@@ -763,17 +1050,17 @@ function afterRender(state) {
         const popupMenu = document.getElementById(`popup-menu-${habitId}`);
         if (popupMenu) {
           popupMenu.style.display =
-            popupMenu.style.display === "none" ? "block" : "none";
+              popupMenu.style.display === "none" ? "block" : "none";
         }
       });
     });
     document.getElementById("addHabit").addEventListener("click", addHabit);
 
     document
-      .getElementById("today")
-      .addEventListener("click", () =>
-        updateCalendar((currentDate = new Date()))
-      );
+        .getElementById("today")
+        .addEventListener("click", () =>
+            updateCalendar((currentDate = new Date()))
+        );
 
     document.querySelectorAll(".circle-card").forEach(card => {
       card.addEventListener("click", () => {
@@ -808,7 +1095,7 @@ function afterRender(state) {
         const popupMenu = document.getElementById(`popup-menu-${catId}`);
         if (popupMenu) {
           popupMenu.style.display =
-            popupMenu.style.display === "none" ? "block" : "none";
+              popupMenu.style.display === "none" ? "block" : "none";
         }
       });
     });
@@ -819,7 +1106,7 @@ function afterRender(state) {
         const popupMenu = document.getElementById(`popup-menu-${rtnId}`);
         if (popupMenu) {
           popupMenu.style.display =
-            popupMenu.style.display === "none" ? "block" : "none";
+              popupMenu.style.display === "none" ? "block" : "none";
         }
       });
     });
@@ -830,31 +1117,31 @@ function afterRender(state) {
         const popupMenu = document.getElementById(`popup-menu-${habitId}`);
         if (popupMenu) {
           popupMenu.style.display =
-            popupMenu.style.display === "none" ? "block" : "none";
+              popupMenu.style.display === "none" ? "block" : "none";
         }
       });
     });
     document
-      .getElementById("delete-habit")
-      .addEventListener("click", deleteHabit);
+        .getElementById("delete-habit")
+        .addEventListener("click", deleteHabit);
     document
-      .getElementById("addHabitBtn")
-      .addEventListener("click", function() {
-        var selectedHabit = document.getElementById("habitSelect").value;
-        if (selectedHabit) {
-          var li = document.createElement("li");
-          li.textContent = selectedHabit;
-          li.setAttribute("data-value", selectedHabit);
-          document.getElementById("selectedHabits").appendChild(li);
+        .getElementById("addHabitBtn")
+        .addEventListener("click", function() {
+          var selectedHabit = document.getElementById("habitSelect").value;
+          if (selectedHabit) {
+            var li = document.createElement("li");
+            li.textContent = selectedHabit;
+            li.setAttribute("data-value", selectedHabit);
+            document.getElementById("selectedHabits").appendChild(li);
 
-          document.getElementById("habitSelect").value = "";
-        }
-      });
+            document.getElementById("habitSelect").value = "";
+          }
+        });
     document.getElementById("addHabit").addEventListener("click", addHabit);
     document.getElementById("addCat").addEventListener("click", menuCat);
     document
-      .getElementById("button_close")
-      .addEventListener("click", myFunction);
+        .getElementById("button_close")
+        .addEventListener("click", myFunction);
     document.getElementById("addRtn").addEventListener("click", menuRtn);
     // document.getElementById("addSavebtn").addEventListener("click", saveHabit);
     document.querySelector("#menu_habit").addEventListener("submit", event => {
@@ -887,17 +1174,17 @@ function afterRender(state) {
       // Log the request body to the console
       console.log("request Body", requestDataHabit);
       axios
-        // Make a POST request to the API to create a new pizza
-        .post(`${process.env.PERPETUA_API_URL}/habits`, requestDataHabit)
-        .then(response => {
-          //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
-          store.Habits.habits.push(response.data);
-          router.navigate("/Habits");
-        })
-        // If there is an error log it to the console
-        .catch(error => {
-          console.log("It puked", error);
-        });
+          // Make a POST request to the API to create a new pizza
+          .post(`${process.env.PERPETUA_API_URL}/habits`, requestDataHabit)
+          .then(response => {
+            //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
+            store.Habits.habits.push(response.data);
+            router.navigate("/Habits");
+          })
+          // If there is an error log it to the console
+          .catch(error => {
+            console.log("It puked", error);
+          });
     });
 
     document.querySelector("#menu_rtn").addEventListener("submit", event => {
@@ -929,17 +1216,17 @@ function afterRender(state) {
       // Log the request body to the console
       console.log("request Body", requestDataRtn);
       axios
-        // Make a POST request to the API to create a new pizza
-        .post(`${process.env.PERPETUA_API_URL}/routines`, requestDataRtn)
-        .then(response => {
-          //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
-          store.Routine.routines.push(response.data);
-          router.navigate("/Habits");
-        })
-        // If there is an error log it to the console
-        .catch(error => {
-          console.log("It puked", error);
-        });
+          // Make a POST request to the API to create a new pizza
+          .post(`${process.env.PERPETUA_API_URL}/routines`, requestDataRtn)
+          .then(response => {
+            //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
+            store.Routine.routines.push(response.data);
+            router.navigate("/Habits");
+          })
+          // If there is an error log it to the console
+          .catch(error => {
+            console.log("It puked", error);
+          });
     });
 
     document.querySelector("#menu_cat").addEventListener("submit", event => {
@@ -958,31 +1245,31 @@ function afterRender(state) {
       // Log the request body to the console
       console.log("request Body", requestDataCat);
       axios
-        // Make a POST request to the API to create a new pizza
-        .post(`${process.env.PERPETUA_API_URL}/categories`, requestDataCat)
-        .then(response => {
-          //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
-          store.Category.categories.push(response.data);
-          router.navigate("/Habits");
-        })
-        // If there is an error log it to the console
-        .catch(error => {
-          console.log("It puked", error);
-        });
+          // Make a POST request to the API to create a new pizza
+          .post(`${process.env.PERPETUA_API_URL}/categories`, requestDataCat)
+          .then(response => {
+            //  Then push the new pizza onto the Pizza state pizzas attribute, so it can be displayed in the pizza list
+            store.Category.categories.push(response.data);
+            router.navigate("/Habits");
+          })
+          // If there is an error log it to the console
+          .catch(error => {
+            console.log("It puked", error);
+          });
     });
 
     document
-      .getElementById("addRtn")
-      .addEventListener("click", () => menuRtn());
+        .getElementById("addRtn")
+        .addEventListener("click", () => menuRtn());
     // document
     //   .getElementById("addHabit")
     //   .addEventListener("click", () => addHabit());
     document
-      .getElementById("addCat")
-      .addEventListener("click", () => menuCat());
+        .getElementById("addCat")
+        .addEventListener("click", () => menuCat());
     document
-      .getElementById("button_close")
-      .addEventListener("click", () => myFunction());
+        .getElementById("button_close")
+        .addEventListener("click", () => myFunction());
   }
 
   document.querySelector(".fa-bars").addEventListener("click", () => {
@@ -993,9 +1280,9 @@ function afterRender(state) {
 router.hooks({
   before: async (done, params) => {
     const view =
-      params && params.data && params.data.view
-        ? capitalize(params.data.view)
-        : "Home";
+        params && params.data && params.data.view
+            ? capitalize(params.data.view)
+            : "Home";
 
     let day = new Date().toLocaleString("en-us", { weekday: "long" }); // Get current day of the week
     if (params && params.data && params.data.day) {
@@ -1010,41 +1297,41 @@ router.hooks({
       case "Home":
         // Add any specific logic for the Home view
         await axios
-          .get(`${process.env.PERPETUA_API_URL}/habits?days=${day}`)
-          .then(response => {
-            store.Home.habits = response.data;
-          })
-          .catch(error => {
-            console.log("It puked", error);
-          });
+            .get(`${process.env.PERPETUA_API_URL}/habits?days=${day}`)
+            .then(response => {
+              store.Home.habits = response.data;
+            })
+            .catch(error => {
+              console.log("It puked", error);
+            });
         done();
         break;
 
       case "Habits":
         await axios
-          .get(`${process.env.PERPETUA_API_URL}/habits`)
-          .then(response => {
-            store.Habits.habits = response.data;
-          })
-          .catch(error => {
-            console.log("It puked", error);
-          });
+            .get(`${process.env.PERPETUA_API_URL}/habits`)
+            .then(response => {
+              store.Habits.habits = response.data;
+            })
+            .catch(error => {
+              console.log("It puked", error);
+            });
         await axios
-          .get(`${process.env.PERPETUA_API_URL}/categories`)
-          .then(response => {
-            store.Habits.categories = response.data;
-          })
-          .catch(error => {
-            console.log("It puked", error);
-          });
+            .get(`${process.env.PERPETUA_API_URL}/categories`)
+            .then(response => {
+              store.Habits.categories = response.data;
+            })
+            .catch(error => {
+              console.log("It puked", error);
+            });
         await axios
-          .get(`${process.env.PERPETUA_API_URL}/routines`)
-          .then(response => {
-            store.Habits.routines = response.data;
-          })
-          .catch(error => {
-            console.log("It puked", error);
-          });
+            .get(`${process.env.PERPETUA_API_URL}/routines`)
+            .then(response => {
+              store.Habits.routines = response.data;
+            })
+            .catch(error => {
+              console.log("It puked", error);
+            });
         done();
         break;
       default:
@@ -1053,24 +1340,24 @@ router.hooks({
   },
   already: params => {
     const view =
-      params && params.data && params.data.view
-        ? capitalize(params.data.view)
-        : "Home";
+        params && params.data && params.data.view
+            ? capitalize(params.data.view)
+            : "Home";
     render(store[view]);
   }
 });
 
 router
-  .on({
-    "/": () => render(),
-    ":view": params => {
-      let view = capitalize(params.data.view);
-      if (view in store) {
-        render(store[view]);
-      } else {
-        render(store.Viewnotfound);
-        console.log(`View ${view} not defined`);
+    .on({
+      "/": () => render(),
+      ":view": params => {
+        let view = capitalize(params.data.view);
+        if (view in store) {
+          render(store[view]);
+        } else {
+          render(store.Viewnotfound);
+          console.log(`View ${view} not defined`);
+        }
       }
-    }
-  })
-  .resolve();
+    })
+    .resolve();
